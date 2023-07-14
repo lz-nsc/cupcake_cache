@@ -4,7 +4,7 @@ import (
 	"container/list"
 )
 
-type Cache struct {
+type LRUCache struct {
 	maxBytes   int64
 	curBytes   int64
 	linkedList *list.List
@@ -25,8 +25,8 @@ type Value interface {
 }
 
 // Cache does not have size limit when maxBytes is set to zero
-func New(maxBytes int64, onEvited func(key string, val Value)) *Cache {
-	return &Cache{
+func New(maxBytes int64, onEvited func(key string, val Value)) *LRUCache {
+	return &LRUCache{
 		maxBytes:   maxBytes,
 		curBytes:   0,
 		linkedList: list.New(),
@@ -35,7 +35,7 @@ func New(maxBytes int64, onEvited func(key string, val Value)) *Cache {
 	}
 }
 
-func (cache *Cache) Get(key string) (Value, bool) {
+func (cache *LRUCache) Get(key string) (Value, bool) {
 	if elem, ok := cache.data[key]; ok {
 		// When element be accessed, move it to the end of the list
 		cache.linkedList.MoveToBack(elem)
@@ -46,7 +46,7 @@ func (cache *Cache) Get(key string) (Value, bool) {
 }
 
 // Remove the oldest key-value pair from cache, remove the head of the list
-func (cache *Cache) RemoveOldest() {
+func (cache *LRUCache) RemoveOldest() {
 	if elem := cache.linkedList.Front(); elem != nil {
 		key := elem.Value.(*entry).key
 		// Remove element from head
@@ -63,7 +63,7 @@ func (cache *Cache) RemoveOldest() {
 	}
 }
 
-func (cache *Cache) Add(key string, val Value) {
+func (cache *LRUCache) Add(key string, val Value) {
 	if elem, ok := cache.data[key]; ok {
 		// If key exists, update the value and move it to the end of the list
 		entry := elem.Value.(*entry)
@@ -86,6 +86,6 @@ func (cache *Cache) Add(key string, val Value) {
 	}
 }
 
-func (c *Cache) Len() int {
+func (c *LRUCache) Len() int {
 	return c.linkedList.Len()
 }
