@@ -1,4 +1,4 @@
-package cupcakecache
+package cupcake_cache
 
 type ByteView struct {
 	bytes []byte

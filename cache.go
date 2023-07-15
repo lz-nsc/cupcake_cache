@@ -1,8 +1,9 @@
-package cupcakecache
+package cupcake_cache
 
 import (
-	"cupcakecache/lru"
 	"sync"
+
+	"github.com/lz-nsc/cupcake_cache/lru"
 )
 
 type cache struct {

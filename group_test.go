@@ -1,4 +1,4 @@
-package cupcakecache
+package cupcake_cache
 
 import (
 	"testing"
