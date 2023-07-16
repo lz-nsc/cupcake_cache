@@ -3,6 +3,8 @@ package cupcake_cache
 import (
 	"errors"
 	"sync"
+
+	"github.com/lz-nsc/cupcake_cache/log"
 )
 
 // GetterFunc is for user to define how to get data from database
@@ -22,6 +24,7 @@ type Group struct {
 	name   string
 	cache  *cache
 	getter Getter
+	remote *cacheHttp
 }
 
 var (
@@ -44,14 +47,20 @@ func NewGroup(name string, size int64, getter Getter) *Group {
 	groups[name] = group
 	return group
 }
-
 func GetGroup(name string) *Group {
 	mu.RLock()
 	defer mu.RUnlock()
 	return groups[name]
 }
 
-func (g Group) Get(key string) (ByteView, error) {
+func (g *Group) SetRemote(remote *cacheHttp) {
+	if g.remote != nil {
+		panic("remote handler already exists")
+	}
+	g.remote = remote
+}
+
+func (g *Group) Get(key string) (ByteView, error) {
 	if key == "" {
 		return ByteView{}, errors.New("got empty key")
 	}
@@ -60,16 +69,45 @@ func (g Group) Get(key string) (ByteView, error) {
 	if ok {
 		return bv, nil
 	}
-	// TODO: If fail to hit the cache on a specific node, then search from another node
+	log.Debug("successfully hit local cache")
 
-	// If fail to hit the cache, then get from database and then save to cache
-	bytes, err := g.getter.Get(key)
+	return g.getFromRemote(key)
+}
+func (g *Group) getFromRemote(key string) (ByteView, error) {
+	// Get from remote cache server
+	bytes, err := g.getFromRemoteCache(key)
 	if err != nil {
-		return ByteView{}, err
+		log.Errorf("failed to get from remote cache, err: %s", err.Error())
 	}
+
+	if bytes == nil {
+		log.Debug("get record from database")
+		// If fail to hit the cache, then get from database and then save to cache
+		bytes, err = g.getter.Get(key)
+		if err != nil {
+			return ByteView{}, err
+		}
+		log.Debug("successfully get record from database")
+	}
+
 	val := make([]byte, len(bytes))
 	// Add data to cache
 	g.cache.add(key, ByteView{val})
 	copy(val, bytes)
 	return ByteView{val}, nil
+}
+
+func (g *Group) getFromRemoteCache(key string) ([]byte, error) {
+	if g.remote == nil {
+		return nil, nil
+	}
+	log.Debug("get record from remote cache")
+
+	bytes, err := g.remote.remoteGet(g.name, key)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debug("successfully get record from remote cache")
+	return bytes, nil
 }

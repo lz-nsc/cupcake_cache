@@ -21,7 +21,7 @@ func main() {
 		return nil, nil
 	}))
 
-	server := cupcake_cache.NewCacheServer("localhost:8080")
+	server := cupcake_cache.NewCacheHttp("localhost:8080")
 
-	log.Fatal(server.Run())
+	log.Fatal(server.RunServer())
 }
