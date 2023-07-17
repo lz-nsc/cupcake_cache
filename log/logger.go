@@ -17,9 +17,9 @@ const (
 )
 
 var (
-	debugLogger = log.New(os.Stdout, "\033[31m[ERROR]\033[0m ", log.LstdFlags|log.Lshortfile)
-	infoLogger  = log.New(os.Stdout, "\033[34m[ERROR]\033[0m ", log.LstdFlags|log.Lshortfile)
-	errorLogger = log.New(os.Stdout, "\033[33m[ERROR]\033[0m ", log.LstdFlags|log.Lshortfile)
+	debugLogger = log.New(os.Stdout, "\033[33m[DEBUG]\033[0m ", log.LstdFlags|log.Lshortfile)
+	infoLogger  = log.New(os.Stdout, "\033[34m[INFO]\033[0m ", log.LstdFlags|log.Lshortfile)
+	errorLogger = log.New(os.Stdout, "\033[31m[ERROR]\033[0m ", log.LstdFlags|log.Lshortfile)
 	Debugf      = debugLogger.Printf
 	Debug       = debugLogger.Println
 	Infof       = infoLogger.Printf

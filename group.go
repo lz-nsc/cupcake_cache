@@ -57,6 +57,7 @@ func (g *Group) SetRemote(remote *cacheHttp) {
 	if g.remote != nil {
 		panic("remote handler already exists")
 	}
+	log.Debugf("Set remote, addr: %s", remote.addr)
 	g.remote = remote
 }
 
@@ -67,9 +68,9 @@ func (g *Group) Get(key string) (ByteView, error) {
 	// First try to get data from cache
 	bv, ok := g.cache.get(key)
 	if ok {
+		log.Debugf("successfully hit local cache, key: %s", key)
 		return bv, nil
 	}
-	log.Debug("successfully hit local cache")
 
 	return g.getFromRemote(key)
 }
@@ -81,33 +82,34 @@ func (g *Group) getFromRemote(key string) (ByteView, error) {
 	}
 
 	if bytes == nil {
-		log.Debug("get record from database")
+		log.Debugf("get record from database, key: %s", key)
 		// If fail to hit the cache, then get from database and then save to cache
 		bytes, err = g.getter.Get(key)
 		if err != nil {
 			return ByteView{}, err
 		}
-		log.Debug("successfully get record from database")
+		log.Debugf("successfully get record from database, key: %s", key)
+
+		val := make([]byte, len(bytes))
+		// Add data to local cache
+		g.cache.add(key, ByteView{val})
+		copy(val, bytes)
 	}
 
-	val := make([]byte, len(bytes))
-	// Add data to cache
-	g.cache.add(key, ByteView{val})
-	copy(val, bytes)
-	return ByteView{val}, nil
+	return ByteView{bytes: bytes}, nil
 }
 
 func (g *Group) getFromRemoteCache(key string) ([]byte, error) {
 	if g.remote == nil {
 		return nil, nil
 	}
-	log.Debug("get record from remote cache")
+	log.Debugf("get record from remote cache, key: %s", key)
 
 	bytes, err := g.remote.remoteGet(g.name, key)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Debug("successfully get record from remote cache")
+	log.Debugf("successfully get record from remote cache, key: %s", key)
 	return bytes, nil
 }

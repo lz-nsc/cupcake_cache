@@ -1,14 +1,14 @@
 package cupcake_cache
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/lz-nsc/cupcake_cache/log"
 )
 
 const defaultBasePath = "/cupcakecache/"
@@ -24,9 +24,10 @@ type cacheHttp struct {
 
 func NewCacheHttp(addr string, hashFn HashFunc) *cacheHttp {
 	return &cacheHttp{
-		addr:     addr,
-		basePath: defaultBasePath,
-		peerMgr:  NewManager(defaultReplicas, hashFn),
+		addr:      addr,
+		basePath:  defaultBasePath,
+		peerMgr:   NewManager(defaultReplicas, hashFn),
+		remoteMap: map[string]string{},
 	}
 }
 
@@ -38,11 +39,11 @@ func (cs *cacheHttp) RunServer() error {
 // cacheHttp accepte request /<basePath>/<groupName>/<key>
 func (cs *cacheHttp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	log.Printf("new request: %s %s", r.Method, r.URL.Path)
+	log.Infof("new request: %s %s", r.Method, r.URL.Path)
 
 	routes := strings.Split(path[len(cs.basePath):], "/")
 	if len(routes) != 2 {
-		log.Printf("bad request, want 2 params, got: %d", len(routes))
+		log.Infof("bad request, want 2 params, got: %d", len(routes))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -64,28 +65,29 @@ func (cs *cacheHttp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write(bv.ByteSlice())
 }
 
-func (cs *cacheHttp) RegisterRemotes(remotes map[string]string) {
+func (cs *cacheHttp) RegisterRemotes(remotes map[string]string) *cacheHttp {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	remoteList := []string{}
-	for name, addr := range remotes {
+	for identifier, addr := range remotes {
 		// make sure server addr does not end with '/'
 		if addr[len(addr)-1] == '/' {
 			addr = addr[:len(addr)-1]
 		}
-		cs.remoteMap[name] = addr + cs.basePath
+		cs.remoteMap[identifier] = addr + cs.basePath
 
-		remoteList = append(remoteList, name)
+		remoteList = append(remoteList, identifier)
 	}
 
 	cs.peerMgr.AddNodes(remoteList...)
+	return cs
 }
 
-func (cs *cacheHttp) RegisterRemote(name string, addr string) {
+func (cs *cacheHttp) RegisterRemote(identifier string, addr string) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	cs.remoteMap[name] = addr
-	cs.peerMgr.AddNodes(name)
+	cs.remoteMap[identifier] = addr
+	cs.peerMgr.AddNodes(identifier)
 }
 
 func (cs *cacheHttp) remoteGet(group string, key string) ([]byte, error) {
@@ -94,11 +96,15 @@ func (cs *cacheHttp) remoteGet(group string, key string) ([]byte, error) {
 	if peer == "" {
 		return nil, fmt.Errorf("failed to find remote with peer key %s", key)
 	}
-	if peer == cs.addr {
-		return nil, errors.New("got self addr while searching remote peer")
-	}
-	peerAddr := cs.remoteMap[peer]
 
+	peerAddr := cs.remoteMap[peer]
+	segs := strings.Split(peerAddr, "//")
+	log.Debugf("segs: %v, addr: %s", segs, cs.addr)
+	if segs[len(segs)-1] == cs.addr+cs.basePath {
+		return nil, nil
+	}
+
+	log.Debugf("Successfully got remote peer, addr: %s", peerAddr)
 	// Send request to remote server
 	url := fmt.Sprintf(
 		"%v%v/%v",
