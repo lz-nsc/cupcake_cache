@@ -15,6 +15,7 @@ const defaultBasePath = "/cupcakecache/"
 const defaultReplicas = 4
 
 type cacheHttp struct {
+	name      string
 	addr      string
 	basePath  string
 	peerMgr   *Manager
@@ -22,8 +23,10 @@ type cacheHttp struct {
 	remoteMap map[string]string
 }
 
-func NewCacheHttp(addr string, hashFn HashFunc) *cacheHttp {
+func NewCacheHttp(name string, addr string, hashFn HashFunc) *cacheHttp {
+	log.WithServer(name, addr)
 	return &cacheHttp{
+		name:      name,
 		addr:      addr,
 		basePath:  defaultBasePath,
 		peerMgr:   NewManager(defaultReplicas, hashFn),
@@ -99,7 +102,6 @@ func (cs *cacheHttp) remoteGet(group string, key string) ([]byte, error) {
 
 	peerAddr := cs.remoteMap[peer]
 	segs := strings.Split(peerAddr, "//")
-	log.Debugf("segs: %v, addr: %s", segs, cs.addr)
 	if segs[len(segs)-1] == cs.addr+cs.basePath {
 		return nil, nil
 	}

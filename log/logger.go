@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -8,6 +9,12 @@ import (
 )
 
 type LogLevel uint
+
+type Logger struct {
+	*log.Logger
+	name string
+	addr string
+}
 
 const (
 	DEBUG LogLevel = iota
@@ -17,9 +24,9 @@ const (
 )
 
 var (
-	debugLogger = log.New(os.Stdout, "\033[33m[DEBUG]\033[0m ", log.LstdFlags|log.Lshortfile)
-	infoLogger  = log.New(os.Stdout, "\033[34m[INFO]\033[0m ", log.LstdFlags|log.Lshortfile)
-	errorLogger = log.New(os.Stdout, "\033[31m[ERROR]\033[0m ", log.LstdFlags|log.Lshortfile)
+	debugLogger = new("\033[33m[DEBUG]\033[0m ")
+	infoLogger  = new("\033[34m[INFO]\033[0m ")
+	errorLogger = new("\033[31m[ERROR]\033[0m ")
 	Debugf      = debugLogger.Printf
 	Debug       = debugLogger.Println
 	Infof       = infoLogger.Printf
@@ -27,9 +34,34 @@ var (
 	Errorf      = errorLogger.Printf
 	Error       = errorLogger.Println
 
-	loggers = []*log.Logger{errorLogger, infoLogger, debugLogger}
+	loggers = []*Logger{errorLogger, infoLogger, debugLogger}
 	mu      sync.Mutex
 )
+
+func new(predix string) *Logger {
+	return &Logger{Logger: log.New(os.Stdout, predix, log.LstdFlags|log.Lshortfile)}
+}
+
+func WithServer(name string, addr string) {
+	for _, logger := range loggers {
+		logger.name = name
+		logger.addr = addr
+	}
+}
+
+func (logger *Logger) Printf(format string, args ...interface{}) {
+	if logger.name != "" {
+		format = "[%s(%s)]" + format
+		args = append([]interface{}{logger.name, logger.addr}, args...)
+	}
+	logger.Logger.Printf(format, args...)
+}
+func (logger *Logger) Println(msg string) {
+	if logger.name != "" {
+		msg = fmt.Sprintf("[ %s (%s) ]", logger.name, logger.addr) + msg
+	}
+	logger.Logger.Println(msg)
+}
 
 func SetLevel(lv LogLevel) {
 	mu.Lock()

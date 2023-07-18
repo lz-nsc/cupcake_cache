@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/lz-nsc/cupcake_cache"
 )
@@ -49,7 +50,14 @@ func main() {
 		"node_2": "http://localhost:8081",
 		"node_3": "http://localhost:8082",
 	}
+	server_name := map[int]string{
+		8080: "node_1",
+		8081: "node_2",
+		8082: "node_3",
+	}
 	group := cupcake_cache.NewGroup("test", 0, cupcake_cache.GetterFunc(func(key string) ([]byte, error) {
+		// Make fake db slow
+		time.Sleep(time.Second * 2)
 		// get data from fake database
 		if val, ok := fakeDatabase[key]; ok {
 			return []byte(val), nil
@@ -62,7 +70,7 @@ func main() {
 		go startProxy(proxyAddr, group)
 	}
 
-	remoteHandler := cupcake_cache.NewCacheHttp("localhost:"+strconv.Itoa(port), nil)
+	remoteHandler := cupcake_cache.NewCacheHttp(server_name[port], "localhost:"+strconv.Itoa(port), nil)
 
 	group.SetRemote(remoteHandler.RegisterRemotes(addrMap))
 	log.Fatal(remoteHandler.RunServer())

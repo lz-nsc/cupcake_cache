@@ -21,10 +21,11 @@ type Getter interface {
 }
 
 type Group struct {
-	name   string
-	cache  *cache
-	getter Getter
-	remote *cacheHttp
+	name    string
+	cache   *cache
+	getter  Getter
+	remote  *cacheHttp
+	callMgr *CallManager
 }
 
 var (
@@ -40,9 +41,10 @@ func NewGroup(name string, size int64, getter Getter) *Group {
 	defer mu.Unlock()
 
 	group := &Group{
-		name:   name,
-		cache:  &cache{size: size},
-		getter: getter,
+		name:    name,
+		cache:   &cache{size: size},
+		getter:  getter,
+		callMgr: NewCallManger(),
 	}
 	groups[name] = group
 	return group
@@ -57,22 +59,29 @@ func (g *Group) SetRemote(remote *cacheHttp) {
 	if g.remote != nil {
 		panic("remote handler already exists")
 	}
-	log.Debugf("Set remote, addr: %s", remote.addr)
 	g.remote = remote
 }
 
 func (g *Group) Get(key string) (ByteView, error) {
-	if key == "" {
-		return ByteView{}, errors.New("got empty key")
+	if g.callMgr == nil {
+		g.callMgr = NewCallManger()
 	}
-	// First try to get data from cache
-	bv, ok := g.cache.get(key)
-	if ok {
-		log.Debugf("successfully hit local cache, key: %s", key)
-		return bv, nil
-	}
+	val, err := g.callMgr.Do(key, func() (interface{}, error) {
+		if key == "" {
+			return ByteView{}, errors.New("got empty key")
+		}
+		// First try to get data from cache
+		bv, ok := g.cache.get(key)
+		if ok {
+			log.Debugf("successfully hit local cache, key: %s", key)
+			return bv, nil
+		}
 
-	return g.getFromRemote(key)
+		return g.getFromRemote(key)
+	})
+
+	return val.(ByteView), err
+
 }
 func (g *Group) getFromRemote(key string) (ByteView, error) {
 	// Get from remote cache server
