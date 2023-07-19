@@ -55,7 +55,12 @@ func main() {
 		8081: "node_2",
 		8082: "node_3",
 	}
-	group := cupcake_cache.NewGroup("test", 0, cupcake_cache.GetterFunc(func(key string) ([]byte, error) {
+
+	server, err := cupcake_cache.NewServer("http", server_name[port], "localhost:"+strconv.Itoa(port), nil)
+	if err != nil {
+		panic("failed to create server")
+	}
+	group := server.AddGroup("test", 0, cupcake_cache.GetterFunc(func(key string) ([]byte, error) {
 		// Make fake db slow
 		time.Sleep(time.Second * 2)
 		// get data from fake database
@@ -64,14 +69,12 @@ func main() {
 		}
 		return nil, nil
 	}))
-
 	if isProxy {
 		proxyAddr := "localhost:" + defaultProxyPort
 		go startProxy(proxyAddr, group)
 	}
 
-	remoteHandler := cupcake_cache.NewCacheHttp(server_name[port], "localhost:"+strconv.Itoa(port), nil)
+	server.RegisterRemotes(addrMap)
 
-	group.SetRemote(remoteHandler.RegisterRemotes(addrMap))
-	log.Fatal(remoteHandler.RunServer())
+	log.Fatal(server.Run())
 }

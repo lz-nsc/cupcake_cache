@@ -7,6 +7,11 @@ import (
 	"github.com/lz-nsc/cupcake_cache/log"
 )
 
+var (
+	mu     sync.RWMutex
+	groups = make(map[string]*Group)
+)
+
 // GetterFunc is for user to define how to get data from database
 // when the application fails to hit the cache with given key
 type GetterFunc func(key string) ([]byte, error)
@@ -24,14 +29,9 @@ type Group struct {
 	name    string
 	cache   *cache
 	getter  Getter
-	remote  *cacheHttp
+	remote  Server
 	callMgr *CallManager
 }
-
-var (
-	mu     sync.RWMutex
-	groups = make(map[string]*Group)
-)
 
 func NewGroup(name string, size int64, getter Getter) *Group {
 	if getter == nil {
@@ -49,13 +49,14 @@ func NewGroup(name string, size int64, getter Getter) *Group {
 	groups[name] = group
 	return group
 }
+
 func GetGroup(name string) *Group {
 	mu.RLock()
 	defer mu.RUnlock()
 	return groups[name]
 }
 
-func (g *Group) SetRemote(remote *cacheHttp) {
+func (g *Group) SetRemote(remote Server) {
 	if g.remote != nil {
 		panic("remote handler already exists")
 	}
@@ -114,7 +115,7 @@ func (g *Group) getFromRemoteCache(key string) ([]byte, error) {
 	}
 	log.Debugf("get record from remote cache, key: %s", key)
 
-	bytes, err := g.remote.remoteGet(g.name, key)
+	bytes, err := g.remote.RemoteGet(g.name, key)
 	if err != nil {
 		return nil, err
 	}

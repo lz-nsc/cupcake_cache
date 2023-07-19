@@ -21,7 +21,9 @@ func main() {
 		return nil, nil
 	}))
 
-	server := cupcake_cache.NewCacheHttp("", "localhost:8080", nil)
-
-	log.Fatal(server.RunServer())
+	server, err := cupcake_cache.NewServer("http", "", "localhost:8080", nil)
+	if err != nil {
+		panic("fail to create cache server")
+	}
+	log.Fatal(server.Run())
 }

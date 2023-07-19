@@ -1,4 +1,4 @@
-package cupcake_cache
+package hash
 
 import (
 	"hash/crc32"
